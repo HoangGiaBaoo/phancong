@@ -79,7 +79,42 @@
 
 ---
 
-## 6. DRAWABLE DÙNG CHUNG XUẤT HIỆN KHẮP NƠI (nhớ để khỏi nhầm là của riêng ai)
+## 7. ⭐ ĐÁNH GIÁ THEO CÔNG SỨC THẬT (số dòng code + độ khó) — quan trọng
+
+> Đếm **số file** dễ đánh lừa: 1 file 400 dòng logic xoắn não nặng hơn 5 file 50 dòng. Dưới đây là đo **số dòng code (LOC)** thực + chấm độ khó logic.
+
+**Tổng:** FE Java 14.119 · BE Java 4.689 · Layout 8.683 dòng.
+
+| Người | Java LOC | Layout LOC | **Tổng LOC** | Độ khó logic | Kết luận công sức |
+|------|--------:|----------:|------------:|--------------|-------------------|
+| 1 | ~3.300 | ~700 | **~4.000** | 🔴 Cao — JWT, Spring Security, bug 404→403 | TB-cao (ít dòng, khái niệm khó) |
+| 2 | ~2.870 | ~900 | **~3.770** | 🟢 Thấp — nhiều adapter nhưng lặp khuôn | **Nhẹ nhất** |
+| 3 | ~4.300 | ~2.000 | **~6.300** | 🔴 Cao — ExoPlayer, LRC sync, Palette | Nặng (cả lượng lẫn khó) |
+| 4 | ~5.200 | ~1.800 | **~7.000** | 🟡 TB — kéo-thả đổi thứ tự, ghép bìa 2x2, adapter đa kiểu | **Nặng nhất về lượng** |
+| 5 | ~3.560 | ~1.270 | **~4.830** | 🔴 Rất cao — VNPay HMAC-SHA512, WebView deeplink | TB-cao (logic khó nhất app) |
+
+> ⚠️ **Chênh lệch thật:** Người 4 (~7.000 dòng) gần **GẤP ĐÔI** Người 2 (~3.770). Cách chia theo % file (P4≈71, P2≈67) đã che mất điều này.
+
+### File "nặng đô" cần lưu ý (giao cho người cứng tay)
+| File | Dòng | Người | Vì sao nặng |
+|------|----:|------|-------------|
+| `PlaylistDetailFragment` + `Activity` | 386+341 | 4 | Palette, bìa 2x2, gợi ý, menu |
+| `AddToPlaylistViewModel` | 333 | 4 | Tạo playlist nội tuyến + multi-select |
+| `PlayerActivity` (+ `activity_player.xml` 433) | 346 | 3 | Palette, lời chạy, seekbar, animate bìa |
+| `MainActivity` | 363 | 1 | Hub: nav + drawer + mini-player + QC |
+| `PlayerManager` | 179 | 3 | Máy trạng thái ExoPlayer |
+| `VnpayService` + `PaymentActivity` | 122+158 | 5 | **Ngắn nhưng khó nhất**: mã hoá HMAC + deeplink |
+| `AdminController` / `DataSeeder` | 291 / 235 | 5 / 1 | Dài **nhưng dễ** (CRUD/seed máy móc) — đừng sợ con số |
+
+### 📌 Khuyến nghị (giữ cách chia dễ học, cân bằng bằng PHÂN CÔNG NGƯỜI)
+1. **Người 3 & 4 là 2 mảng nặng nhất** → giao cho 2 bạn code cứng nhất nhóm.
+2. **Người 5 & 1 ít dòng hơn nhưng logic khó nhất** (VNPay, bảo mật) → giao cho bạn chịu khó đọc tài liệu.
+3. **Người 2 nhẹ nhất** → bạn này nên **hỗ trợ Người 4** (vd nhận phần màn Album: `AlbumDetail` + album đã lưu) nếu muốn cân chính xác. Đây là 1 thao tác chuyển gọn, mình làm trong 5 phút nếu nhóm đồng ý.
+4. Đừng sợ `AdminController` 291 hay `DataSeeder` 235 dòng — chúng dài nhưng là CRUD/seed máy móc, đọc 1 lần là hiểu.
+
+---
+
+## 8. DRAWABLE DÙNG CHUNG XUẤT HIỆN KHẮP NƠI (nhớ để khỏi nhầm là của riêng ai)
 - `placeholder_gradient` — ảnh chờ khi load bìa (≈ 40 màn dùng).
 - `ic_arrow_back` / `ic_chevron_down` / `ic_close` — nút quay lại/đóng.
 - `ic_more_vert` — nút 3 chấm.
