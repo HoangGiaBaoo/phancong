@@ -1,185 +1,89 @@
 # NGƯỜI 5 — Premium, Thanh toán, Hồ sơ, Cài đặt & Thống kê
 
-> **Bạn lo "tiền & tài khoản cá nhân".** Mảng của bạn: gói **Premium** + **thanh toán VNPay** (WebView), khóa tính năng (**gate**) + **quảng cáo** cho user Free, và các màn cá nhân: **Hồ sơ, Sửa hồ sơ, Cài đặt, Thống kê nghe**. Đây là mảng có luồng **phức tạp nhất về tích hợp ngoài** (cổng thanh toán + AdMob).
-
----
-
-## 0. NỀN TẢNG DÙNG CHUNG (đọc nhanh — chi tiết ở file 01)
-Khuôn MVVM như cả nhóm. Bạn dùng `SubscriptionRepository` + `UserRepository`. Khái niệm trung tâm: **trạng thái Premium** — quyết định ẩn quảng cáo, mở khóa shuffle/tải xuống. Đọc bằng `util/PremiumChecker.isPremium(subscription)`.
-
----
-
-## 1. SƠ ĐỒ LUỒNG MẢNG CỦA BẠN
+> **Miền dữ liệu:** `Subscription`, `UserSettings`. **Vai trò:** gói **Premium** + **thanh toán VNPay** (WebView), khóa tính năng (**gate**) + **quảng cáo AdMob** cho user Free, và các màn cá nhân: **Hồ sơ, Sửa hồ sơ, Cài đặt, Thống kê nghe**. Luồng tích hợp ngoài phức tạp nhất.
 
 ```
-Tab Premium ─► PremiumFragment ─► hiện các gói (Free/Cá nhân/Sinh viên/Gia đình)
-     │ bấm "Nâng cấp"
-     ▼
-PremiumPlansActivity ─► chọn gói ─► SubscriptionViewModel.subscribe()
-     │ POST /api/subscriptions/subscribe → tạo subscription PENDING + trả payUrl VNPay
-     ▼
-PaymentActivity (WebView mở payUrl VNPay sandbox)
-     │ user thanh toán xong → VNPay redirect về backend → backend kích hoạt Premium
-     │ → redirect deep-link  musicapp://payment/result?status=success
-     ▼
-quay lại app, trạng thái = Premium → ẩn quảng cáo, mở khóa tính năng
-
-User Free chạm tính năng khóa → Gate bottom sheet → "Khám phá" → PremiumPlansActivity
-   ├─ PremiumGateBottomSheet  (chung)
-   ├─ ShuffleGateBottomSheet  (nút trộn bài ở Player/Album/Playlist)
-   └─ DownloadGateBottomSheet (nút tải xuống ở Album/Playlist)
-
-Drawer ─► Hồ sơ / Sửa hồ sơ / Cài đặt / Thống kê nghe
+Tab Premium → PremiumPlansActivity → subscribe → POST /api/subscriptions/subscribe (tạo PENDING + payUrl)
+   → PaymentActivity (WebView VNPay) → thanh toán → BE kích hoạt Premium → deep-link musicapp://payment/result
+Free chạm tính năng khóa → Gate sheet → "Khám phá" → PremiumPlansActivity
+Drawer → Hồ sơ / Cài đặt / Thống kê
 ```
 
 ---
 
-## 2. CHI TIẾT TỪNG CHỨC NĂNG
+## 1. BẢNG FILE ANDROID (FE)
 
-### 2.1. TAB PREMIUM & DANH SÁCH GÓI
+| File | Loại | Chức năng |
+|------|------|-----------|
+| `fragment/PremiumFragment.java` | Fragment | Tab Premium: quyền lợi + nút nâng cấp |
+| `PremiumPlansActivity.java` | Activity | Danh sách gói (Cá nhân/Sinh viên/Gia đình) để mua |
+| `PaymentActivity.java` | Activity ⭐ | WebView VNPay; bắt deep-link kết quả + rewrite localhost→10.0.2.2 |
+| `fragment/PremiumGateBottomSheet.java` | BottomSheet | Gate chung |
+| `fragment/ShuffleGateBottomSheet.java` | BottomSheet | Gate khi Free chạm nút trộn bài |
+| `fragment/DownloadGateBottomSheet.java` | BottomSheet | Gate khi Free chạm nút tải xuống |
+| `ProfileActivity.java` | Activity | Xem hồ sơ |
+| `EditProfileActivity.java` | Activity | Sửa tên + đổi avatar (upload) |
+| `SettingsActivity.java` | Activity | Công tắc cài đặt + Đăng xuất |
+| `ListeningStatsActivity.java` | Activity | Thống kê: tổng thời lượng, top bài/nghệ sĩ |
+| `SubscriptionViewModel.java` | ViewModel | Tải gói + subscription hiện tại; `subscribe/cancel` |
+| `ProfileViewModel`/`EditProfileViewModel`/`SettingsViewModel`/`ListeningStatsViewModel` | ViewModel | 4 màn cá nhân |
+| `SubscriptionRepository.java` | Repository | API subscription + payment |
+| `data/repository/UserRepository.java` | Repository | `getMe/getMyProfile/updateProfile/uploadAvatar/settings` (chung Người 1) |
+| `util/PremiumChecker.java` | Util ⭐ | `isPremium(sub)` — quyết định ẩn QC, mở khóa |
+| `util/AdManager.java` | Util | Nạp banner + interstitial; `setPremium(true)`→tắt |
+| `Subscription`/`PlanInfo`/`SubscribeRequest`/`SubscribeResponse` | Model | Gói & thanh toán |
+| `UserProfile`/`ProfileUpdateRequest`/`UserSettings`/`ListeningStats` | Model | Hồ sơ/cài đặt/thống kê |
 
-**File cần đọc (FE):**
-- `fragment/PremiumFragment.java` + `fragment_premium.xml` — tab Premium: giới thiệu quyền lợi + nút nâng cấp.
-- `PremiumPlansActivity.java` + `activity_premium_plans.xml` — danh sách gói chi tiết để chọn mua.
-- `viewmodel/SubscriptionViewModel.java` — **đọc kỹ**. Tải gói (`getPlans`), tải subscription hiện tại (`getMySubscription`), `subscribe(plan)`, `cancel()`.
-- `data/repository/SubscriptionRepository.java` — gọi API subscription + payment.
-- `util/PremiumChecker.java` — hàm tĩnh `isPremium(sub)` (đang ACTIVE & chưa hết hạn?).
-- `adapter` gói + `item_premium_reason.xml` (lý do nên mua).
-- models: `Subscription`, `PlanInfo`, `SubscribeRequest`, `SubscribeResponse`.
+## 2. BẢNG FILE BACKEND (BE)
 
-**File cần đọc (BE):**
-- `controller/SubscriptionController.java` — `GET /api/subscriptions/me`, `/plans`, `POST /subscribe`, `/cancel`.
-- `service/SubscriptionService.java` — tạo/hủy subscription, kiểm tra đang active.
-- `service/SubscriptionAlreadyActiveException.java` — chặn mua khi đang có gói.
-- `service/PremiumGuard.java` — chặn tính năng Premium ở backend (nếu có endpoint cần Premium).
-- `entity/Subscription.java`, `entity/SubscriptionPlan.java` (enum FREE/INDIVIDUAL/STUDENT/FAMILY), `repository/SubscriptionRepository.java`.
-- `dto/PlanInfoDto.java`, `dto/SubscribeRequest.java`.
+| File | Loại | Chức năng |
+|------|------|-----------|
+| `controller/SubscriptionController.java` | Controller | `/api/subscriptions/me\|plans\|subscribe\|cancel` |
+| `service/SubscriptionService.java` | Service | Tạo/hủy gói, kiểm tra đang active |
+| `service/SubscriptionAlreadyActiveException.java` | Exception | Chặn mua khi đang có gói |
+| `controller/PaymentController.java` | Controller | `POST /api/payment/create`, `GET /api/payment/vnpay-return` |
+| `service/VnpayService.java` | Service ⭐ | Sinh URL VNPay (HMAC-SHA512) + verify callback |
+| `service/PremiumGuard.java` | Service | Chặn tính năng Premium ở BE |
+| `controller/UserController.java` | Controller | `/api/users/me`, `/me/profile`, `/me/avatar` |
+| `service/UserService.java` | Service | Logic hồ sơ |
+| `controller/UserSettingsController.java` | Controller | `GET/PUT /api/users/me/settings` |
+| `service/UserSettingsService.java` | Service | Đọc/ghi cài đặt |
+| `controller/StatsController.java` | Controller | `GET /api/stats/listening?period=` |
+| `service/ListeningStatsService.java` | Service | Tính top bài/nghệ sĩ/tổng từ `PlayHistory` |
+| `controller/AdminController.java` | Controller | `/api/admin/**` CRUD (admin) — tham khảo, có thể đồng sở hữu |
+| `entity/Subscription.java` | Entity | Bảng `Subscriptions` |
+| `entity/SubscriptionPlan.java` | Enum | FREE/INDIVIDUAL/STUDENT/FAMILY |
+| `entity/UserSettings.java` | Entity | Cài đặt user |
+| `entity/StreamQuality.java` | Enum | Chất lượng nhạc |
+| `repository/SubscriptionRepository, UserSettingsRepository` | Repository | Truy vấn |
+| `dto/PlanInfoDto, SubscribeRequest, UserMeDto, UserProfileDto, ProfileUpdateRequest, UserSettingsDto, ListeningStatsDto, TopTrackDto, TopArtistDto` | DTO | Gói/hồ sơ/cài đặt/thống kê |
 
-### 2.2. THANH TOÁN VNPAY (luồng phức tạp nhất — đọc kỹ)
+## 3. DRAWABLE / ANIM THEO MÀN
 
-**File cần đọc (FE):**
-- `PaymentActivity.java` — **đọc rất kỹ**. WebView mở trang VNPay. Bắt deep-link kết quả + **rewrite host localhost → 10.0.2.2** (nếu không sẽ `ERR_CONNECTION_REFUSED`).
-- `res/layout/activity_payment.xml` — WebView + progress.
+| Màn (layout) | drawable dùng |
+|--------------|---------------|
+| `fragment_premium` | `bg_card_pink`, `ic_premium`, `bg_reasons_card`, `bg_btn_white_pill` (Java: `ic_no_ads/download/shuffle/audio_quality/friends/queue_add`) |
+| `activity_premium_plans` | `ic_arrow_back`, `bg_premium_individual/student/family`, `bg_pill_pink/purple/green`, `ic_premium`, `bg_btn_pill_pink/purple/green` |
+| `activity_payment` | (chỉ WebView, không icon) |
+| `bottom_sheet_premium_gate` | `ic_premium`, `bg_btn_white_pill` |
+| `bottom_sheet_shuffle_gate` | `ic_premium`, `ic_shuffle`, `ic_queue`, `bg_btn_pill_green` |
+| `bottom_sheet_download_gate` | `ic_premium`, `placeholder_gradient`, `bg_btn_pill_green` |
+| `activity_profile` | `ic_arrow_back`, `ic_avatar_placeholder`, `ic_share`, `ic_more_vert` |
+| `activity_edit_profile` | `ic_close`, `ic_avatar_placeholder` |
+| `activity_settings` | `ic_arrow_back` |
+| `activity_listening_stats` | `ic_arrow_back`, `ic_share` |
+| `item_premium_reason` / `item_stats_section` | `ic_no_ads` / `bg_card_dark`, `ic_avatar_placeholder`, `placeholder_gradient` |
 
-**File cần đọc (BE):**
-- `controller/PaymentController.java` — `POST /api/payment/create` (tạo URL thanh toán), `GET /api/payment/vnpay-return` (VNPay gọi về sau khi thanh toán).
-- `service/VnpayService.java` — **đọc kỹ**. Sinh URL thanh toán có chữ ký HMAC-SHA512 (`createPaymentUrl`) và kiểm tra chữ ký khi VNPay callback (`verifyCallback`).
+> Banner/interstitial AdMob hiển thị ở `MainActivity` (khung Người 1) — bạn điều khiển qua `AdManager`.
 
-**Luồng thanh toán (học thuộc — đây là điểm nhấn demo):**
-1. User chọn gói → `SubscriptionViewModel.subscribe()` → `POST /api/subscriptions/subscribe` → BE tạo `Subscription` trạng thái **PENDING**, rồi `VnpayService.createPaymentUrl(subscriptionId, amount, ip)` sinh URL VNPay (kèm `vnp_SecureHash`).
-2. FE nhận `payUrl` → mở `PaymentActivity` (WebView) → `loadUrl(payUrl)`.
-3. User nhập thẻ test trên VNPay sandbox → thanh toán.
-4. VNPay **redirect 302** về `vnp_ReturnUrl` = `GET /api/payment/vnpay-return?...` (kèm mã kết quả + chữ ký).
-5. BE `PaymentController.vnpayReturn()` → `VnpayService.verifyCallback(params)`:
-   - Dựng lại chuỗi hash từ tham số, ký lại HMAC-SHA512, so với `vnp_SecureHash`.
-   - Khớp + `vnp_ResponseCode == "00"` → **kích hoạt Premium** (đổi Subscription sang ACTIVE).
-   - Rồi redirect về deep-link `musicapp://payment/result?status=success` (hoặc `failed`).
-6. `PaymentActivity` bắt deep-link đó trong `shouldOverrideUrlLoading` → `setResult(status)` → `finish()` → về `PremiumPlansActivity`.
-7. App `loadCurrentSubscription()` lại → `PremiumChecker.isPremium` = true → ẩn quảng cáo, mở khóa.
+## 4. LUỒNG THANH TOÁN VNPAY (điểm nhấn demo)
+1. Chọn gói → `SubscriptionViewModel.subscribe()` → `POST /api/subscriptions/subscribe` → BE tạo `Subscription` **PENDING** + `VnpayService.createPaymentUrl` (ký HMAC-SHA512) trả `payUrl`.
+2. FE mở `PaymentActivity` (WebView) `loadUrl(payUrl)`.
+3. User thanh toán → VNPay **redirect** `GET /api/payment/vnpay-return` → `VnpayService.verifyCallback` (ký lại, so hash, mã `00`) → **kích hoạt Premium** → redirect deep-link `musicapp://payment/result?status=success`.
+4. `PaymentActivity` bắt deep-link → trả status → `loadCurrentSubscription()` → `PremiumChecker.isPremium`=true → ẩn QC, mở khóa.
 
-> ⚠️ **Gotcha quan trọng (đã ghi trong memory dự án):** backend cấu hình `vnp_ReturnUrl` là `localhost` → trên máy ảo "localhost" trỏ về chính máy ảo → WebView lỗi kết nối. `PaymentActivity.rewriteLocalhost()` đổi host sang `10.0.2.2` (host trong `RetrofitClient.BASE_URL`). Nhớ điều này khi demo.
+> ⚠️ **Gotcha:** `vnp_ReturnUrl` là `localhost` → trên máy ảo phải rewrite host sang `10.0.2.2` (`PaymentActivity.rewriteLocalhost`), nếu không WebView lỗi `ERR_CONNECTION_REFUSED`.
 
-### 2.3. KHÓA TÍNH NĂNG (Gate) cho user Free
-
-**File cần đọc (FE):**
-- `fragment/PremiumGateBottomSheet.java` + `bottom_sheet_premium_gate.xml` — gate chung.
-- `fragment/ShuffleGateBottomSheet.java` + `bottom_sheet_shuffle_gate.xml` — bật khi Free chạm nút trộn bài (ở Player/Album/Playlist của Người 3/4).
-- `fragment/DownloadGateBottomSheet.java` + `bottom_sheet_download_gate.xml` — bật khi Free chạm nút tải xuống (Album/Playlist).
-
-**Luồng:** màn của Người 3/4 kiểm tra `isPremium`; nếu Free → `new ShuffleGateBottomSheet().show(...)`. Trong sheet, nút "Khám phá" → mở `PremiumPlansActivity` (màn của bạn). **Bạn cung cấp các sheet này, người khác chỉ gọi.**
-
-### 2.4. QUẢNG CÁO (AdMob) cho user Free
-
-**File cần đọc (FE):**
-- `util/AdManager.java` — **đọc kỹ**. Nạp banner + quảng cáo xen kẽ (interstitial). `setPremium(true)` → tắt quảng cáo.
-- Banner hiển thị ở `MainActivity` (khung của Người 1): `renderAdsForSubscription()` — Premium ẩn, Free hiện.
-- Interstitial: thường bật sau vài lần đổi bài (qua `PlayerManager.setAdListener` của Người 3).
-
-**Luồng:** `MainActivity` quan sát subscription → `AdManager.setPremium(isPremium)` → quyết định hiện/ẩn quảng cáo. Đây là lý do quảng cáo gắn chặt với trạng thái Premium của bạn.
-
-### 2.5. HỒ SƠ & SỬA HỒ SƠ
-
-**File cần đọc (FE):**
-- `ProfileActivity.java` + `activity_profile.xml` — xem hồ sơ (avatar, tên hiển thị, số playlist/đang theo dõi...).
-- `EditProfileActivity.java` + `activity_edit_profile.xml` — sửa tên hiển thị + đổi avatar (upload ảnh).
-- `viewmodel/ProfileViewModel.java`, `viewmodel/EditProfileViewModel.java`.
-- `data/repository/UserRepository.java` — `getMe`, `getMyProfile`, `updateProfile`, `uploadAvatar` (dùng chung với drawer của Người 1).
-- models: `UserProfile`, `ProfileUpdateRequest`, `UserMe`.
-
-**File cần đọc (BE):**
-- `controller/UserController.java` + `service/UserService.java` — `GET /api/users/me`, `/me/profile`, `PUT /me/profile`, `POST /me/avatar`.
-- `dto/UserMeDto.java`, `dto/UserProfileDto.java`, `dto/ProfileUpdateRequest.java`.
-
-**Luồng sửa hồ sơ:** nhập tên/chọn ảnh → `EditProfileViewModel` → `UserRepository.updateProfile()` (+ `uploadAvatar` multipart) → `PUT /api/users/me/profile` → về cập nhật lại drawer/Profile.
-
-### 2.6. CÀI ĐẶT
-
-**File cần đọc (FE):**
-- `SettingsActivity.java` + `activity_settings.xml` — các công tắc (phiên riêng tư, chất lượng nhạc...), nút Đăng xuất.
-- `viewmodel/SettingsViewModel.java` — đọc/ghi settings (thường debounce khi đổi công tắc).
-- `data/repository/UserRepository.java` (phần settings) + `model/UserSettings.java`.
-
-**File cần đọc (BE):**
-- `controller/UserSettingsController.java` + `service/UserSettingsService.java` — `GET/PUT /api/users/me/settings`.
-- `entity/UserSettings.java`, `entity/StreamQuality.java`, `repository/UserSettingsRepository.java`, `dto/UserSettingsDto.java`.
-
-**Luồng:** mở → `GET /api/users/me/settings` → đổ vào công tắc. Đổi công tắc → `vm.onSwitchChanged()` → (debounce) → `PUT /api/users/me/settings`. Nút Đăng xuất → xóa token (qua `SessionManager`/`TokenManager` của Người 1) → về Login.
-
-### 2.7. THỐNG KÊ NGHE
-
-**File cần đọc (FE):**
-- `ListeningStatsActivity.java` + `activity_listening_stats.xml` — biểu đồ/danh sách: tổng thời lượng, top bài, top nghệ sĩ theo tuần/tháng/năm.
-- `viewmodel/ListeningStatsViewModel.java` — `GET /api/stats/listening?period=&offset=`.
-- `adapter` + `item_stats_section.xml`.
-- `model/ListeningStats.java`.
-
-**File cần đọc (BE):**
-- `controller/StatsController.java` + `service/ListeningStatsService.java` — tính từ bảng `PlayHistory` (của Người 3).
-- `dto/ListeningStatsDto.java`, `dto/TopTrackDto.java`, `dto/TopArtistDto.java`.
-
-**Luồng:** chọn kỳ (tuần/tháng/năm) → `ListeningStatsViewModel` → `GET /api/stats/listening` → `ListeningStatsService` gom `PlayHistory` theo thời gian → trả top + tổng → render.
-
----
-
-## 3. ✅ CHECKLIST "FILE CỦA TÔI" (Người 5)
-
-**Android — màn hình & sheet & layout:**
-- [ ] `PremiumFragment` + `fragment_premium.xml`
-- [ ] `PremiumPlansActivity` + `activity_premium_plans.xml`
-- [ ] `PaymentActivity` + `activity_payment.xml`
-- [ ] `PremiumGateBottomSheet`/`ShuffleGateBottomSheet`/`DownloadGateBottomSheet` + 3 layout `bottom_sheet_*_gate.xml`
-- [ ] `ProfileActivity` + `activity_profile.xml`
-- [ ] `EditProfileActivity` + `activity_edit_profile.xml`
-- [ ] `SettingsActivity` + `activity_settings.xml`
-- [ ] `ListeningStatsActivity` + `activity_listening_stats.xml` (+ `item_stats_section.xml`, `item_premium_reason.xml`)
-
-**Android — ViewModel / Repository / Util:**
-- [ ] `SubscriptionViewModel`, `ProfileViewModel`, `EditProfileViewModel`, `SettingsViewModel`, `ListeningStatsViewModel`
-- [ ] `SubscriptionRepository` (+ dùng chung `UserRepository`)
-- [ ] `util/PremiumChecker`, `util/AdManager`
-- [ ] models: `Subscription`, `PlanInfo`, `SubscribeRequest`, `SubscribeResponse`, `UserProfile`, `ProfileUpdateRequest`, `UserSettings`, `ListeningStats`
-
-**Backend:**
-- [ ] `controller/SubscriptionController`, `service/SubscriptionService`, `service/SubscriptionAlreadyActiveException`, `service/PremiumGuard`
-- [ ] `controller/PaymentController`, `service/VnpayService`
-- [ ] `entity/Subscription`, `entity/SubscriptionPlan`, `repository/SubscriptionRepository`
-- [ ] `controller/UserController`, `service/UserService`
-- [ ] `controller/UserSettingsController`, `service/UserSettingsService`, `entity/UserSettings`, `entity/StreamQuality`, `repository/UserSettingsRepository`
-- [ ] `controller/StatsController`, `service/ListeningStatsService`
-- [ ] dto: `PlanInfoDto`, `SubscribeRequest`, `UserMeDto`, `UserProfileDto`, `ProfileUpdateRequest`, `UserSettingsDto`, `ListeningStatsDto`, `TopTrackDto`, `TopArtistDto`
-
----
-
-## 4. ENDPOINT API MẢNG BẠN DÙNG
-- `GET /api/subscriptions/me`, `/plans`, `POST /api/subscriptions/subscribe`, `/cancel`
-- `POST /api/payment/create`, `GET /api/payment/vnpay-return` (VNPay gọi về)
-- `GET /api/users/me`, `/me/profile`, `PUT /me/profile`, `POST /me/avatar`
-- `GET /api/users/me/settings`, `PUT /api/users/me/settings`
-- `GET /api/stats/listening?period=week|month|year&offset=`
-
-## 5. ĐIỂM GIAO VỚI NGƯỜI KHÁC
-- Bạn cung cấp 3 **gate sheet** + `PremiumChecker` cho Người 3 (Player/Album) và Người 4 (Playlist) gọi khi user Free chạm tính năng khóa.
-- `AdManager` + banner hiển thị trong **MainActivity** (khung Người 1); interstitial gắn vào `PlayerManager` (Người 3).
-- `UserRepository` dùng chung với Người 1 (drawer header).
-- `ListeningStatsService` đọc bảng `PlayHistory` (Người 3) → khi họ đổi cách ghi lịch sử, thống kê bị ảnh hưởng.
-- Khi mua Premium xong, app gọi lại `loadCurrentSubscription()` ở MainActivity (Người 1) để ẩn quảng cáo.
+## 5. ENDPOINT · GIAO
+- **Endpoint:** `/api/subscriptions/*`, `/api/payment/{create,vnpay-return}`, `/api/users/me{,/profile,/avatar,/settings}`, `/api/stats/listening`.
+- **Giao:** cung cấp 3 **gate sheet** + `PremiumChecker` cho Người 3 (Player) & Người 4 (Album/Playlist) gọi · banner+interstitial gắn vào `MainActivity` (Người 1) + `PlayerManager` (Người 3) · `UserRepository` & endpoint `/api/users/me` dùng chung Người 1 (drawer) · `ListeningStatsService` đọc `PlayHistory` (Người 3).

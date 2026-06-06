@@ -1,164 +1,87 @@
-# NGƯỜI 4 — Thư viện, Danh sách phát & Yêu thích/Theo dõi
+# NGƯỜI 4 — Album, Danh sách phát & Thư viện
 
-> **Bạn là "kho cá nhân" của người dùng.** Tab **Thư viện** gom: playlist của tôi, nghệ sĩ đang theo dõi, album đã lưu, bài hát đã thích, nghe gần đây. Bạn lo **toàn bộ CRUD playlist** (tạo, thêm/xóa bài, đổi thứ tự, sửa tên, đổi ảnh bìa, xóa) — phần thao tác nhiều nhất app. Bạn sở hữu `LibraryRepository` (repository to nhất) và 5 bảng quan hệ ở backend.
-
----
-
-## 0. NỀN TẢNG DÙNG CHUNG (đọc nhanh — chi tiết ở file 01)
-Khuôn MVVM như cả nhóm. Bạn sở hữu **`LibraryRepository`** — repository dùng chung nhiều nhất (Album/Artist/Track/Playlist/Genre đều có hàm ở đây). `VmFactory` tạo phần lớn ViewModel của bạn bằng `new XxxViewModel(new LibraryRepository(api))`.
-
----
-
-## 1. SƠ ĐỒ LUỒNG MẢNG CỦA BẠN
+> **Miền dữ liệu:** `Album`, `Playlist`, `PlaylistTrack`, `SavedAlbum`. **Vai trò:** **Chi tiết Album** + lưu album vào thư viện, **toàn bộ CRUD Playlist** (tạo/thêm/xóa bài/đổi thứ tự/sửa tên/ảnh bìa/xóa), và **màn Thư viện** (hub gom playlist/nghệ sĩ/album/đã thích). Thao tác nhiều nhất app.
 
 ```
-Tab Thư viện ─► LibraryFragment ─► LibraryViewModel ─► LibraryRepository
-     │ chip lọc: Playlist | Nghệ sĩ | Album | Đã thích
-     │   ├─ Playlist  → GET /api/playlists
-     │   ├─ Nghệ sĩ   → GET /api/artists/followed
-     │   ├─ Album     → GET /api/albums/saved
-     │   └─ Đã thích  → GET /api/tracks/liked
-     └─ bấm item ─► NavHelper.openPlaylist/openArtist/openAlbum/openLiked
-
-Tab "Tạo" (nút giữa bottom-nav) ─► CreateBottomSheet ─► tạo playlist mới
-
-PlaylistDetail (1 playlist) ─► thêm bài / sửa thứ tự / đổi tên / đổi ảnh bìa / xóa
-     ├─ AddTracksBottomSheet      → POST /api/playlists/{id}/tracks
-     ├─ EditPlaylistActivity      → PUT  /api/playlists/{id}/tracks/order (kéo-thả đổi thứ tự)
-     ├─ PlaylistEditBottomSheet   → PUT  /api/playlists/{id} (tên/mô tả)
-     └─ PlaylistCoverPickerActivity → POST /api/playlists/{id}/cover (upload ảnh)
+NavHelper.openAlbum → AlbumDetailFragment → GET /api/albums/{id}/tracks (+ nút lưu thư viện)
+Tab Thư viện → LibraryFragment (4 chip) → playlist / album đã lưu / nghệ sĩ / đã thích
+Nút "Tạo" → CreateBottomSheet → playlist mới → PlaylistDetail (thêm/sửa/đổi thứ tự/ảnh bìa/xóa)
 ```
 
 ---
 
-## 2. CHI TIẾT TỪNG CHỨC NĂNG
+## 1. BẢNG FILE ANDROID (FE)
 
-### 2.1. TAB THƯ VIỆN (màn gom tất cả)
+| File | Loại | Chức năng |
+|------|------|-----------|
+| `fragment/AlbumDetailFragment.java` / `AlbumDetailActivity.java` | Fragment/Activity | Chi tiết album + nút [+thư viện][tải][⋮][shuffle][play] |
+| `fragment/AlbumMenuBottomSheet.java` | BottomSheet | Menu ⋮ album: thêm/xoá thư viện, tải→gate, tới nghệ sĩ |
+| `AlbumDetailViewModel.java` | ViewModel | Tải album + bài + trạng thái "đã lưu" |
+| `fragment/LibraryFragment.java` | Fragment | **Tab Thư viện**: 4 chip lọc, item ghim "Đã thích" |
+| `LibraryViewModel.java` | ViewModel | `loadFor(chip)` lấy playlist/nghệ sĩ/album/đã thích |
+| `LibraryAdapter.java` / `LibraryPagerAdapter.java` | Adapter | Danh sách đa kiểu trong Thư viện |
+| `ui/PlaylistCoverView.java` | View | Ảnh bìa playlist (1 ảnh hoặc ghép 2x2) |
+| `fragment/PlaylistsFragment.java` | Fragment | Danh sách playlist của tôi |
+| `PlaylistsViewModel.java` | ViewModel | Tải playlist |
+| `fragment/PlaylistDetailFragment.java` / `PlaylistDetailActivity.java` | Fragment/Activity | Chi tiết playlist + nút [tải][⋮][shuffle][play] + gợi ý |
+| `PlaylistDetailViewModel.java` | ViewModel | Tải + thêm/xoá/sửa/xoá playlist |
+| `fragment/PlaylistMenuBottomSheet.java` | BottomSheet | Menu ⋮ playlist (tải/thêm/sửa/tên/ảnh bìa/xoá) |
+| `fragment/CreateBottomSheet.java` | BottomSheet | Nút "Tạo" → tạo playlist |
+| `fragment/AddTracksBottomSheet.java` + `AddTracksViewModel.java` | Sheet+VM | Thêm bài vào playlist (từ trong playlist) |
+| `fragment/AddToPlaylistBottomSheet.java` + `AddToPlaylistViewModel.java` | Sheet+VM | Thêm 1 bài bất kỳ vào playlist (chọn đích) |
+| `EditPlaylistActivity.java` + `EditPlaylistViewModel.java` | Activity+VM | Kéo-thả đổi thứ tự bài |
+| `fragment/PlaylistEditBottomSheet.java` | BottomSheet | Sửa tên/mô tả/riêng tư |
+| `PlaylistCoverPickerActivity.java` | Activity | Chọn ảnh máy → upload bìa |
+| `TrackDetailAdapter` | Adapter | Danh sách bài trong album/playlist |
+| `SuggestedTrackAdapter` | Adapter | Gợi ý thêm bài (playlist rỗng) |
+| `PlaylistAdapter` | Adapter | Danh sách playlist |
+| `AddTrackAdapter`/`PlaylistPickerAdapter`/`EditPlaylistTrackAdapter` | Adapter | Thêm bài / chọn playlist / kéo-thả sửa |
+| `Album`/`Playlist`/`PlaylistRequest`/`PlaylistReorderRequest` | Model | DTO |
+| `data/repository/LibraryRepository.java` | Repository ⭐ | **Repo to nhất** — album/playlist/genre/liked/followed (dùng chung) |
 
-**File cần đọc (FE):**
-- `fragment/LibraryFragment.java` — **đọc kỹ**. Thanh chip lọc (Playlist/Nghệ sĩ/Album/Đã thích), 1 RecyclerView đa kiểu, item ghim "Bài hát đã thích" luôn ở đầu, các nút "Thêm" cuối danh sách. `onResume` gọi `vm.refresh()`.
-- `res/layout/fragment_library.xml` + `item_library_row.xml`, `item_library_artist.xml`, `item_library_liked.xml`, `item_library_action.xml`.
-- `viewmodel/LibraryViewModel.java` — **đọc kỹ**. Enum `Chip{ALL,PLAYLIST,ARTIST,ALBUM,LIKED}`. Mỗi chip `loadFor(chip)` gọi nguồn tương ứng. Giữ `playlists`, `artists`, `savedAlbums`, `liked`, `likedCount`.
-- `adapter/LibraryAdapter.java` — adapter đa kiểu (playlist/artist/album/track/action/liked-songs). Có cache ảnh bìa playlist (ghép 4 ảnh bài).
-- `adapter/LibraryPagerAdapter.java` — nếu Thư viện có dạng tab/pager.
-- `ui/PlaylistCoverView.java` + `view_playlist_cover.xml` — view ảnh bìa playlist (1 ảnh hoặc ghép 2x2 từ ảnh các bài).
+## 2. BẢNG FILE BACKEND (BE)
 
-**Luồng:** mở tab → `LibraryViewModel` (constructor) `loadFor(ALL)` + `loadLikedCount()` → đổ vào `LibraryAdapter`. Bấm chip → `onChipSelected` → `loadFor(chip)`. Bấm item → `NavHelper.openXxx`.
+| File | Loại | Chức năng |
+|------|------|-----------|
+| `controller/AlbumController.java` | Controller | `/api/albums`, `/new`, `/{id}`, `/{id}/tracks`, `/saved`, `/{id}/saved`, `/{id}/save` |
+| `service/AlbumService.java` | Service | Logic album |
+| `controller/PlaylistController.java` | Controller | CRUD playlist + tracks + order + cover |
+| `service/PlaylistService.java` | Service | Logic playlist |
+| `service/LibraryService.java` | Service | Album đã lưu: `getSavedAlbums/toggleSaveAlbum/isAlbumSaved` |
+| `entity/Album.java` | Entity | Bảng `Albums` |
+| `entity/AlbumType.java` | Enum | ALBUM/SINGLE/EP/COMPILATION |
+| `entity/Playlist.java` | Entity | Bảng `Playlists` (có `coverUrl`,`description`,`isCurated`,`mood`) |
+| `entity/PlaylistTrack.java` + `PlaylistTrackId.java` | Entity | Bài trong playlist (có cột `position`) |
+| `entity/SavedAlbum.java` + `SavedAlbumId.java` | Entity | Album đã lưu (khoá kép user+album) |
+| `repository/AlbumRepository, PlaylistRepository, PlaylistTrackRepository, SavedAlbumRepository` | Repository | Truy vấn 4 bảng |
+| `dto/PlaylistRequest, PlaylistResponse, PlaylistUpdateRequest, PlaylistReorderRequest` | DTO | Body/kết quả playlist |
 
-> 💡 **Mẹo nhớ:** Library = "1 danh sách, lọc theo 4 chip, mỗi chip lấy từ 1 endpoint khác nhau". Toàn bộ nguồn dữ liệu nằm trong `LibraryViewModel.loadFor()`.
+> ⚠️ Bảng nối có cột phụ (`position`, `savedAt`) là **Entity riêng** với `@EmbeddedId` (khoá kép), KHÔNG dùng `@ManyToMany` → vì vậy mỗi quan hệ có 2 file (`Xxx`+`XxxId`).
 
-### 2.2. BÀI HÁT ĐÃ THÍCH / NGHỆ SĨ ĐANG THEO DÕI / NGHE GẦN ĐÂY
+## 3. DRAWABLE / ANIM THEO MÀN
 
-**File cần đọc (FE):**
-- `fragment/LikedTracksFragment.java` + `fragment_liked_tracks.xml` ; `fragment/LikedSongsFragment.java` + `fragment_liked_songs.xml` ; `LikedSongsActivity.java` + `activity_liked_songs.xml` — màn "Bài hát đã thích".
-- `viewmodel/LikedTracksViewModel.java` — `GET /api/tracks/liked`.
-- `fragment/FollowingArtistsFragment.java` + `fragment_following_artists.xml` ; `viewmodel/FollowingArtistsViewModel.java` — `GET /api/artists/followed`.
-- `fragment/RecentFragment.java` + `fragment_recent.xml` ; `RecentActivity.java` + `activity_recent.xml` ; `viewmodel/RecentViewModel.java` — `GET /api/history/recent`.
-- `fragment/PlaylistsFragment.java` + `fragment_playlists.xml` ; `viewmodel/PlaylistsViewModel.java` — danh sách playlist của tôi.
-- **Adapter:** `TrackListAdapter` (`item_track_list.xml`), `ArtistListAdapter` (`item_artist_list.xml`), `PlaylistAdapter` (`item_playlist_list.xml`), `RecentSectionAdapter` (`item_recent_header.xml`).
-- `model/RecentItem.java`.
+| Màn (layout) | drawable dùng |
+|--------------|---------------|
+| `fragment_album_detail` | `placeholder_gradient`, `ic_arrow_back`, `ic_add_circle_outline`, `ic_download`, `ic_more_vert`, `ic_shuffle`, `ic_play` (Java đổi `ic_check_circle_green` khi đã lưu) |
+| `bottom_sheet_album_menu` | `placeholder_gradient`, `ic_add_circle_outline`, `ic_download`, `ic_person` |
+| `fragment_library` | `bg_avatar_orange`, `ic_search`, `ic_add`, `bg_chip_selector`×4, `ic_sort`, `ic_grid` |
+| `fragment_playlist_detail` | `ic_arrow_back`, `ic_download`, `ic_more_vert`, `ic_shuffle`, `ic_play`, `ic_add`, `ic_drag_handle`, `ic_edit` |
+| `bottom_sheet_playlist_menu` | `placeholder_gradient`, `ic_download`, `ic_plus_circle`, `ic_drag_handle`, `ic_edit`, `ic_camera`, `ic_delete` |
+| `bottom_sheet_create` | `bg_circle_dark`, `ic_music_note`, `ic_collab`, `ic_blend`, `bg_close_circle`, `ic_close` |
+| `bottom_sheet_add_to_playlist` / `add_tracks` | `bg_search_field`, `ic_search` |
+| `item_add_track` | `placeholder_gradient`, `ic_play`, `ic_add_circle_outline` |
+| `item_edit_playlist_track` | `ic_remove_circle`, `placeholder_gradient`, `ic_drag_handle` |
+| `sheet_playlist_edit` | `ic_edit`, `bg_edit_field`, `ic_lock_outline`, `ic_delete` |
+| `view_playlist_cover` | `placeholder_gradient` (×5 — ghép 2x2) |
+| `dialog_create_playlist` / `dialog_discard_changes` | `bg_dialog_dark`,`ic_close` / `bg_dialog_white` |
 
-**Luồng:** đều giống nhau — Fragment → ViewModel → `LibraryRepository.getLikedTracks()/getFollowedArtists()/getRecentTracks()` → render list. Bấm bài → phát nhạc (PlayerManager — Người 3).
+> Màn của bạn không dùng `anim` riêng (chuyển màn dùng anim chung của Người 1).
 
-### 2.3. TẠO PLAYLIST MỚI
+## 4. LUỒNG ĐỔI THỨ TỰ BÀI (ví dụ thao tác phức tạp)
+1. `EditPlaylistActivity` → `EditPlaylistTrackAdapter` + `ItemTouchHelper` kéo-thả.
+2. Lưu danh sách `trackIds` theo thứ tự mới → `LibraryRepository.reorderPlaylistTracks` → `PUT /api/playlists/{id}/tracks/order`.
+3. BE `PlaylistService` cập nhật cột `position` trong `PlaylistTrack`.
 
-**File:** `fragment/CreateBottomSheet.java` + `bottom_sheet_create.xml` — sheet bật lên từ nút "Tạo" giữa bottom-nav: có "Danh sách phát". Dùng `dialog_create_playlist.xml` để nhập tên.
-**BE:** `POST /api/playlists` (body `{name, isPublic}`).
-**Luồng:** nút Tạo (ở MainActivity của Người 1) → `CreateBottomSheet` → nhập tên → `LibraryRepository.createPlaylist(name, isPublic)` → `POST /api/playlists` → mở luôn `PlaylistDetail` của playlist vừa tạo.
-
-### 2.4. MÀN CHI TIẾT PLAYLIST (trung tâm thao tác)
-
-**File cần đọc (FE):**
-- `fragment/PlaylistDetailFragment.java` — **đọc kỹ**. Hiện bìa (ghép 2x2), danh sách bài, nút **[tải xuống] [⋮] ... [shuffle] [play]**, gợi ý thêm bài khi rỗng.
-- `res/layout/fragment_playlist_detail.xml` ; `PlaylistDetailActivity.java` + `activity_playlist_detail.xml`.
-- `viewmodel/PlaylistDetailViewModel.java` — tải playlist + bài + gợi ý; xử lý thêm/xóa/sửa/xóa playlist (enum `EditResult`).
-- `fragment/PlaylistMenuBottomSheet.java` + `bottom_sheet_playlist_menu.xml` — menu ⋮ (Tải xuống→gate, Thêm bài, Chỉnh sửa, Tên & chi tiết, Tạo ảnh bìa, Xóa playlist).
-- `adapter/TrackDetailAdapter.java` (dùng chung Người 3), `adapter/SuggestedTrackAdapter.java` + `item_suggested_track.xml` (gợi ý thêm bài).
-
-**Luồng:** `NavHelper.openPlaylist` → `PlaylistDetailFragment` → `PlaylistDetailViewModel.loadIfNeeded()`: `GET /api/playlists/{id}` + `/{id}/tracks`. Rỗng → gọi gợi ý. Bấm bài → phát. Các nút mở các sheet/màn con bên dưới.
-
-### 2.5. THÊM BÀI VÀO PLAYLIST (2 lối)
-
-**File:**
-- `fragment/AddTracksBottomSheet.java` + `bottom_sheet_add_tracks.xml` + `viewmodel/AddTracksViewModel.java` + `item_add_track.xml` — từ trong 1 playlist, mở sheet chọn bài để thêm.
-- `fragment/AddToPlaylistBottomSheet.java` + `bottom_sheet_add_to_playlist.xml` + `viewmodel/AddToPlaylistViewModel.java` + `item_playlist_picker.xml`, `item_playlist_picker_section.xml` — từ 1 bài bất kỳ (menu ⋮), chọn playlist đích (hoặc tạo mới).
-**BE:** `POST /api/playlists/{id}/tracks?trackId=`.
-**Luồng:** chọn bài/playlist → `LibraryRepository.addTrackToPlaylist(playlistId, trackId)` → reload playlist.
-
-### 2.6. CHỈNH SỬA PLAYLIST (đổi thứ tự kéo-thả)
-
-**File:** `EditPlaylistActivity.java` + `activity_edit_playlist.xml` + `viewmodel/EditPlaylistViewModel.java` + `adapter` kéo-thả (`item_edit_playlist_track.xml`), `dialog_discard_changes.xml`.
-**BE:** `PUT /api/playlists/{id}/tracks/order` (body `{trackIds:[...]}`), `DELETE /api/playlists/{id}/tracks/{trackId}`.
-**Luồng:** kéo-thả đổi vị trí (ItemTouchHelper) → lưu danh sách `trackIds` theo thứ tự mới → `reorderPlaylistTracks(...)`.
-
-### 2.7. SỬA TÊN/MÔ TẢ & ĐỔI ẢNH BÌA
-
-**File:**
-- `fragment/PlaylistEditBottomSheet.java` + `sheet_playlist_edit.xml` — sửa tên + mô tả + quyền riêng tư. BE: `PUT /api/playlists/{id}`.
-- `PlaylistCoverPickerActivity.java` + `activity_playlist_cover_picker.xml` — chọn ảnh từ máy upload. BE: `POST /api/playlists/{id}/cover` (multipart).
-**Luồng upload bìa:** chọn ảnh → đọc bytes → `LibraryRepository.uploadPlaylistCover(id, bytes, mime)` → BE lưu file, trả `coverUrl` → reload.
-
-### 2.8. XÓA PLAYLIST
-Menu ⋮ → "Xóa" → `AlertDialog` xác nhận → `LibraryRepository.deletePlaylist(id)` → `DELETE /api/playlists/{id}` → `popBackStack`.
-
-### 2.9. THÊM NGHỆ SĨ ĐỂ THEO DÕI
-**File:** `AddArtistActivity.java` + `activity_add_artist.xml` + `viewmodel/AddArtistViewModel.java` + `adapter/SelectableArtistAdapter.java` + `item_selectable_artist.xml`. BE: `POST /api/artists/{id}/follow`.
-
-### 2.10. BACKEND của bạn (5 bảng quan hệ)
-
-**File cần đọc (BE):**
-- `controller/PlaylistController.java` + `service/PlaylistService.java` — toàn bộ CRUD playlist + reorder + cover. **Đọc kỹ.**
-- `service/LibraryService.java` — album đã lưu (`getSavedAlbums`, `toggleSaveAlbum`, `isAlbumSaved`) + tổng hợp thư viện.
-- **Entity + Repository (bảng nối N-N có cột phụ → entity riêng):**
-  - `Playlist` + `PlaylistRepository`
-  - `PlaylistTrack` + `PlaylistTrackId` + `PlaylistTrackRepository` (có cột `position` để sắp thứ tự).
-  - `LikedTrack` + `LikedTrackId` + `LikedTrackRepository` (bài đã thích).
-  - `FollowedArtist` + `FollowedArtistId` + `FollowedArtistRepository` (nghệ sĩ theo dõi).
-  - `SavedAlbum` + `SavedAlbumId` + `SavedAlbumRepository` (album lưu thư viện).
-- **DTO:** `PlaylistRequest`, `PlaylistResponse`, `PlaylistUpdateRequest`, `PlaylistReorderRequest`.
-
-> ⚠️ **Lưu ý kỹ thuật quan trọng:** các bảng nối có cột phụ (như `position`, `savedAt`) phải là **Entity riêng** với `@EmbeddedId` (khóa kép userId+itemId), KHÔNG dùng `@ManyToMany`. Đây là lý do mỗi quan hệ có 2 file (`Xxx` + `XxxId`).
-
----
-
-## 3. ✅ CHECKLIST "FILE CỦA TÔI" (Người 4)
-
-**Android — màn hình & sheet & layout:**
-- [ ] `LibraryFragment` + `fragment_library.xml` (+ item_library_*.xml)
-- [ ] `PlaylistsFragment` + `fragment_playlists.xml`
-- [ ] `FollowingArtistsFragment` + `fragment_following_artists.xml`
-- [ ] `LikedTracksFragment`/`LikedSongsFragment`/`LikedSongsActivity` + layout
-- [ ] `RecentFragment`/`RecentActivity` + layout
-- [ ] `PlaylistDetailFragment`/`PlaylistDetailActivity` + layout
-- [ ] `CreateBottomSheet`, `AddTracksBottomSheet`, `AddToPlaylistBottomSheet`, `PlaylistEditBottomSheet`, `PlaylistMenuBottomSheet` + layout
-- [ ] `EditPlaylistActivity`, `PlaylistCoverPickerActivity`, `AddArtistActivity` + layout
-
-**Android — ViewModel / Repository / Adapter / UI:**
-- [ ] `LibraryViewModel`, `PlaylistsViewModel`, `FollowingArtistsViewModel`, `LikedTracksViewModel`, `RecentViewModel`, `PlaylistDetailViewModel`, `AddToPlaylistViewModel`, `AddTracksViewModel`, `EditPlaylistViewModel`, `AddArtistViewModel`
-- [ ] `LibraryRepository` (repository to nhất — bạn sở hữu)
-- [ ] `LibraryAdapter`, `LibraryPagerAdapter`, `PlaylistAdapter`, `TrackListAdapter`, `ArtistListAdapter`, `SelectableArtistAdapter`, `RecentSectionAdapter`, `SuggestedTrackAdapter`
-- [ ] `ui/PlaylistCoverView` + `view_playlist_cover.xml`
-- [ ] models: `Playlist`, `RecentItem`, `PlaylistRequest`, `PlaylistReorderRequest`
-
-**Backend:**
-- [ ] `controller/PlaylistController`, `service/PlaylistService`, `service/LibraryService`
-- [ ] `entity/Playlist` + `PlaylistRepository`
-- [ ] `entity/PlaylistTrack` + `PlaylistTrackId` + `PlaylistTrackRepository`
-- [ ] `entity/LikedTrack` + `LikedTrackId` + `LikedTrackRepository`
-- [ ] `entity/FollowedArtist` + `FollowedArtistId` + `FollowedArtistRepository`
-- [ ] `entity/SavedAlbum` + `SavedAlbumId` + `SavedAlbumRepository`
-- [ ] `dto/PlaylistRequest`, `PlaylistResponse`, `PlaylistUpdateRequest`, `PlaylistReorderRequest`
-
----
-
-## 4. ENDPOINT API MẢNG BẠN DÙNG
-- `GET /api/playlists`, `GET /api/playlists/curated?mood=`, `POST /api/playlists`, `GET /api/playlists/{id}`, `GET /api/playlists/{id}/tracks`
-- `POST /api/playlists/{id}/tracks?trackId=`, `DELETE /api/playlists/{id}/tracks/{trackId}`, `PUT /api/playlists/{id}/tracks/order`
-- `PUT /api/playlists/{id}`, `DELETE /api/playlists/{id}`, `POST /api/playlists/{id}/cover`
-- `GET /api/tracks/liked`, `GET /api/artists/followed`, `GET /api/albums/saved`, `GET /api/history/recent?limit=`
-
-## 5. ĐIỂM GIAO VỚI NGƯỜI KHÁC
-- `LibraryRepository` (của bạn) được Người 2 (genre feed) và Người 3 (album/artist detail) dùng chung — sửa hàm phải báo.
-- Nút Like/Follow/Save nằm ở màn của Người 3 nhưng **ghi vào bảng của bạn** (LikedTrack/FollowedArtist/SavedAlbum). Bạn lo phần đọc lại (hiển thị trong Thư viện).
-- Nút "Tải xuống" trong playlist mở gate Premium (Người 5).
-- Mở Create từ nút "Tạo" của MainActivity (Người 1).
+## 5. ENDPOINT · GIAO
+- **Endpoint:** `/api/albums/*` (gồm saved), `/api/playlists/*` (CRUD + order + cover).
+- **Giao:** Library hub gọi `/api/tracks/liked` + `/api/artists/followed` (endpoint của **Người 3**) cho 2 chip "Đã thích/Nghệ sĩ" · bấm bài → `PlayerManager.play()` (Người 3) · nút "Tải xuống" → gate Premium (Người 5) · `LibraryRepository` (của bạn) được Người 2 (genre feed) & Người 3 (chi tiết) dùng chung · nút "Tạo" nằm ở `MainActivity` (Người 1).
