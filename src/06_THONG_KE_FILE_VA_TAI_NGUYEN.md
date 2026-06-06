@@ -114,6 +114,27 @@
 
 ---
 
+## 7b. ENDPOINT KHAI BÁO MÀ CHƯA DÙNG (13 cái — app Android không gọi)
+
+> Backend có sẵn + `ApiService` khai báo, nhưng **không màn nào gọi**. Biết để khỏi tưởng có màn mà đi tìm; cũng là "đất" làm thêm nếu mảng ai mỏng.
+
+| Endpoint | Vì sao không dùng |
+|----------|-------------------|
+| `/api/charts/tracks` · `/api/charts/artists` | Chart chỉ hiện trong **Home feed** (BE dựng sẵn), không có màn riêng |
+| `/api/subscriptions/plans` | 3 gói **hard-code** trong `activity_premium_plans.xml` |
+| `/api/albums/{id}` (getAlbum) | Màn Album lấy `getAlbums()` rồi lọc |
+| `/api/albums/new` · `/api/playlists/curated` · `/api/artists/popular` | Đã gộp trong Home feed |
+| `/api/recommendations/mix` | Chỉ dùng `/daily` |
+| `/api/genres/{id}/tracks` | Màn Thể loại dùng `/feed` |
+| `/api/tracks/{id}/related` · `/api/artists/{id}/related` | Thẻ "Khám phá" ở Player là placeholder, chưa nối |
+| `/api/tracks/{id}` (getTrack) · `/api/history` (full) | Không cần — đã có list / chỉ dùng `/recent` |
+
+> 📌 **Hệ quả phân công:** "Bảng xếp hạng" (Người 2) và "danh sách gói" (Người 5) **nhẹ hơn** con số thoạt nhìn. Ngược lại, nối các endpoint trên vào UI là cách **làm dày** mảng nếu cần.
+
+> 🔧 **util dùng chung:** `ItemAnim` (hiệu ứng item RecyclerView) dùng bởi adapter của Người 2/3/4 — không thuộc riêng ai.
+
+---
+
 ## 8. DRAWABLE DÙNG CHUNG XUẤT HIỆN KHẮP NƠI (nhớ để khỏi nhầm là của riêng ai)
 - `placeholder_gradient` — ảnh chờ khi load bìa (≈ 40 màn dùng).
 - `ic_arrow_back` / `ic_chevron_down` / `ic_close` — nút quay lại/đóng.

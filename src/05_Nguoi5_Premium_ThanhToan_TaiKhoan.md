@@ -84,6 +84,24 @@ Drawer → Hồ sơ / Cài đặt / Thống kê
 
 > ⚠️ **Gotcha:** `vnp_ReturnUrl` là `localhost` → trên máy ảo phải rewrite host sang `10.0.2.2` (`PaymentActivity.rewriteLocalhost`), nếu không WebView lỗi `ERR_CONNECTION_REFUSED`.
 
+## 4b. ⭐ CHÈN QUẢNG CÁO (AdMob) — tính năng XUYÊN MÀN (chủ: Người 5)
+
+Quảng cáo chỉ hiện cho user **Free**; Premium tắt sạch. 2 loại: **banner** (dải dưới Main) + **interstitial** (toàn màn, mỗi 3 bài).
+
+| File | Người (vị trí) | Vai trò |
+|------|----------------|---------|
+| `util/AdManager.java` ⭐ | **5** | Lõi: nạp/hiện interstitial, đếm 3 bài/lần, pause nhạc khi hiện ad, `setPremium` |
+| `util/PremiumChecker.java` | 5 | `isPremium` → bật/tắt quảng cáo |
+| `MainActivity.java` (`b.adBanner`) + `activity_main.xml` (`<AdView>`) | 1 (khung) | Banner: hiện/ẩn theo Premium, load/resume/pause/destroy |
+| `MusicApp.java` | 1 (khung) | `ActivityLifecycleCallbacks` theo dõi Activity foreground + cắm `adListener` phụ vào PlayerManager để đếm bài |
+| `util/PlayerManager.java` (`setAdListener`) | 3 | Slot listener PHỤ (tách khỏi UI) để AdManager đếm bài |
+| `build.gradle` + `AndroidManifest` (AdMob App ID) | 1 | Thư viện `play-services-ads` |
+
+**Luồng interstitial:** `MusicApp` cắm listener phụ → mỗi lần đổi bài gọi `AdManager.onTrackPlayed()` → đếm, đủ bội số 3 (Free) → cố hiện; hiện thì **pause nhạc**, đóng ad → **phát lại** + preload ad kế. Đang chuyển màn (activity null) → hoãn, lần resume kế `maybeShowPending()` xả ra.
+**Luồng banner:** `MainActivity` quan sát subscription → `AdManager.setPremium()` → Free hiện `adBanner.loadAd()`, Premium ẩn.
+
+> ⚠️ Quảng cáo **không thuộc trọn 1 người**: chủ là Người 5 (AdManager + PremiumChecker) nhưng điểm cắm ở file của Người 1 (`MainActivity`, `MusicApp`) và Người 3 (`PlayerManager`). 3 bạn thống nhất khi sửa. Độ khó: TB (~120 dòng, state bất đồng bộ + vòng đời Activity).
+
 ## 5. ENDPOINT · GIAO
 - **Endpoint:** `/api/subscriptions/*`, `/api/payment/{create,vnpay-return}`, `/api/users/me{,/profile,/avatar,/settings}`, `/api/stats/listening`.
 - **Giao:** cung cấp 3 **gate sheet** + `PremiumChecker` cho Người 3 (Player) & Người 4 (Album/Playlist) gọi · banner+interstitial gắn vào `MainActivity` (Người 1) + `PlayerManager` (Người 3) · `UserRepository` & endpoint `/api/users/me` dùng chung Người 1 (drawer) · `ListeningStatsService` đọc `PlayHistory` (Người 3).

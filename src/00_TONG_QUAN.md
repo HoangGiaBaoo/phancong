@@ -82,6 +82,30 @@ Backend:  Controller → Service → Repository (JPA) → Entity ↔ MySQL
 
 ---
 
+## 4b. ⭐ TÍNH NĂNG XUYÊN MÀN (không thuộc 1 người — dễ bị bỏ sót)
+
+> Chia theo màn hình dễ quên các tính năng "cắm" vào nhiều màn. Liệt kê ở đây để mỗi nhóm biết mình đụng tới.
+
+| Tính năng | File chính | Chủ | Cắm vào file của ai |
+|-----------|-----------|-----|----------------------|
+| Quảng cáo AdMob (banner + interstitial mỗi 3 bài) | `AdManager`, `PremiumChecker` | **5** | MainActivity, `MusicApp` (1) · `PlayerManager` (3) |
+| Mini-player (dải nhạc nổi) | `MiniPlayerController`, `layout_mini_player` | **3** | MainActivity (1 — khung) |
+| Khung xương Shimmer (lúc tải) | `layout_shimmer_*` + thư viện Shimmer | mỗi màn tự lo | Home(2), Library(4), Album/Playlist(3,4), Genre(2) |
+| Đổi màu nền theo ảnh bìa (Palette) | androidx.palette | mỗi màn tự lo | Player(3), Playlist(4) |
+| Ép trộn bài cho Free → gate | `ShuffleGateBottomSheet` | **5** | Player(3), Album/Playlist/Liked(3,4) |
+| 3 gate Premium (tải/trộn/chung) | `*GateBottomSheet` | **5** | gọi từ Player(3), Album/Playlist(4) |
+| Ghi lịch sử nghe (mỗi lần phát) | `recordPlay`→`PlayHistory` | **3** (ghi) | dùng bởi Home(2), Recent(3), Stats(5) |
+| Badge "HQ" (nhạc chất lượng cao) | `updateHqBadge`, `StreamQuality` | 3 hiện / 5 premium | — |
+| Đa tài khoản | `AccountStore`, `AccountAdapter` | **1** | — |
+
+**Hạ tầng/cấu hình (chủ: Người 1):** edge-to-edge opt-out (`targetSdk 36` + `values-v35`) · dark theme (`values-night`) · cho phép HTTP (`usesCleartextTraffic`) · khởi tạo MobileAds + theo dõi vòng đời Activity (`MusicApp`).
+
+### ⚠️ Phạm vi cần nhóm quyết
+- **`AdminController` (291 dòng) + `GenreAdminController` (110 dòng)** = ~400 dòng BE phục vụ **web admin React** (CORS `localhost:5173`); **app Android KHÔNG gọi**. Nếu nhóm không làm web admin → 2 file này ngoài phạm vi demo Android.
+- **`POST /api/auth/refresh`** có ở BE nhưng **FE chưa dùng** (gặp 401/403 là đăng xuất luôn) — khoảng trống đã biết.
+
+---
+
 ## 5. Cấu trúc mỗi file phân công (01–05)
 
 1. Vai trò + sơ đồ luồng.
