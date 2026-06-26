@@ -12,24 +12,24 @@ Mỗi người ôm trọn **1 nhóm entity** + tất cả màn hình/API liên q
 | Người | Miền dữ liệu (entity sở hữu) | Mảng tính năng |
 |------|------------------------------|----------------|
 | **1** | `User` + bảo mật | Đăng nhập, Đăng ký, Đa tài khoản, **Khung app (MainActivity)**, **Hồ sơ/Sửa hồ sơ** + **nền tảng mạng dùng chung** |
-| **2** | `Genre`, `Mood`, **`Album`**, `AlbumType`, `SavedAlbum` | Trang chủ (feed), Tìm kiếm, Thể loại, Bảng xếp hạng, Gợi ý, **Chi tiết Album + lưu album** |
+| **2** | `Genre`, `Mood` | Trang chủ (feed), Tìm kiếm, Thể loại, Bảng xếp hạng, Gợi ý |
 | **3** | `Track`, `Artist`, `PlayHistory`, `LikedTrack`, `FollowedArtist` | **Trình phát**, Lời bài hát, **Chi tiết Nghệ sĩ**, Bài đã thích, Đang theo dõi, Nghe gần đây, **ShuffleController** |
-| **4** | `Playlist`, `PlaylistTrack` | **Danh sách phát (CRUD đầy đủ)**, màn **Thư viện** (hub) |
+| **4** | **`Album`**, `AlbumType`, `SavedAlbum`, `Playlist`, `PlaylistTrack` | **Chi tiết Album + lưu album**, **Danh sách phát (CRUD đầy đủ)**, màn **Thư viện** (hub) |
 | **5** | `Subscription`, `UserSettings` | Premium, Thanh toán VNPay, **Quảng cáo AdMob**, Gate, Cài đặt, Thống kê |
 
-> 📌 Miền **Album** thuộc **Người 2** (cùng "tìm nhạc" → hợp luồng *duyệt → mở album*). Album đã lưu vẫn hiện trong **Thư viện của Người 4** qua endpoint của Người 2 — giống cách Library hiện liked/followed của Người 3. Người 4 lo trọn **Playlist CRUD + Thư viện**.
+> 📌 **Album, Playlist, album đã lưu** đều thuộc **Người 4** (cùng nhóm "bộ sưu tập" + chung `LibraryRepository`). Trang chủ/tìm kiếm (Người 2) chỉ *hiển thị thẻ* rồi bấm sang màn chi tiết của Người 4 — nhờ vậy Người 2 là mảng **nhẹ & dễ nhất**.
 
 ### 🧠 Câu thần chú để nhớ phần của mình (1 dòng/người)
 - **Người 1** — *"Tôi lo cho user VÀO được app + hồ sơ."* (đăng nhập + khung app + hồ sơ)
-- **Người 2** — *"Tôi lo cho user TÌM & MỞ nhạc."* (trang chủ + tìm kiếm + thể loại + **album**)
+- **Người 2** — *"Tôi lo cho user TÌM thấy nhạc."* (trang chủ + tìm kiếm + thể loại)
 - **Người 3** — *"Tôi lo BÀI HÁT & NGHỆ SĨ: nghe, thích, theo dõi."*
-- **Người 4** — *"Tôi lo DANH SÁCH PHÁT & THƯ VIỆN: tạo, sửa, gom."*
+- **Người 4** — *"Tôi lo ALBUM, DANH SÁCH PHÁT & THƯ VIỆN: mở, tạo, sửa, gom."*
 - **Người 5** — *"Tôi lo TIỀN: Premium, thanh toán, quảng cáo, cài đặt."*
 
 ### 🎯 Mức độ khó từng mảng (nhóm tự phân theo năng lực)
 Xếp từ **dễ học → khó** (chi tiết LOC ở `06` mục 7):
-1. **Người 2** (trang chủ / tìm kiếm / album) — 🟢 **dễ nhất**: chủ yếu RecyclerView adapter lặp khuôn, phần ghép feed nặng đã nằm sẵn ở backend. *Quan trọng nhất cho demo* (bộ mặt & độ "sinh động" của app) và nhiều màn (~78 file) nên khối lượng vẫn đầy đặn.
-2. **Người 4** (playlist + thư viện) — 🟡 **trung bình**: CRUD nhiều thao tác, kéo-thả đổi thứ tự, ghép bìa 2x2.
+1. **Người 2** (trang chủ / tìm kiếm / thể loại) — 🟢 **dễ nhất + nhẹ nhất**: chủ yếu RecyclerView adapter lặp khuôn, phần ghép feed nặng đã nằm sẵn ở backend. *Quan trọng nhất cho demo* (bộ mặt & độ "sinh động" của app) → vừa quan trọng vừa dễ, hợp người ít kinh nghiệm.
+2. **Người 4** (album + playlist + thư viện) — 🟡 **trung bình nhưng nhiều dòng nhất** (~7.000): CRUD nhiều thao tác, kéo-thả đổi thứ tự, ghép bìa 2x2 — hợp người làm nhanh.
 3. **Người 1** (đăng nhập + khung app + hồ sơ) — 🟠 **TB-cao**: ít dòng nhưng khái niệm khó (JWT, Spring Security, nền tảng chung cả nhóm xài).
 4. **Người 5** (premium + thanh toán + quảng cáo) — 🔴 **cao**: VNPay HMAC-SHA512, WebView deeplink, AdMob — logic tích hợp ngoài khó nhất.
 5. **Người 3** (trình phát + nghệ sĩ + nhạc cá nhân) — 🔴 **nặng nhất**: ExoPlayer, đồng bộ lời LRC, Palette — cả lượng lẫn kỹ thuật.
@@ -38,9 +38,9 @@ Xếp từ **dễ học → khó** (chi tiết LOC ở `06` mục 7):
 | Người | Bảng / enum sở hữu |
 |------|--------------------|
 | **1** | `User` |
-| **2** | `Genre`, `Mood`, **`Album`**, **`AlbumType`**, **`SavedAlbum`**(+Id) |
+| **2** | `Genre`, `Mood` |
 | **3** | `Track`, `Artist`, `PlayHistory`, `LikedTrack`(+Id), `FollowedArtist`(+Id) |
-| **4** | `Playlist`, `PlaylistTrack`(+Id) |
+| **4** | **`Album`**, **`AlbumType`**, **`SavedAlbum`**(+Id), `Playlist`, `PlaylistTrack`(+Id) |
 | **5** | `Subscription`, `SubscriptionPlan`, `UserSettings`, `StreamQuality` |
 
 > 📌 **Cách học nhanh nhất:** nhớ BẢNG của mình trước → rồi mọi màn hình/API/Controller/Service nào đụng tới bảng đó đều là của mình. Tra ngược trong `network/ApiService.java`: endpoint nào liên quan bảng của mình thì thuộc về mình.
@@ -70,12 +70,12 @@ Backend:  Controller → Service → Repository (JPA) → Entity ↔ MySQL
 | Người | Đọc kỹ (FE Java + layout + BE Java) | LOC ước tính | Ghi chú |
 |------|------------------------------------:|-------------:|---------|
 | 1 | ≈ 57 | ~4.600 | đăng nhập + khung app + hồ sơ + **nền tảng chung** (JWT/Security — khó) |
-| 2 | ≈ 78 | ~5.300 | trang chủ + tìm kiếm + thể loại **+ album** (đa adapter) |
+| 2 | ≈ 67 | ~3.770 | trang chủ + tìm kiếm + thể loại (đa adapter — **dễ & nhẹ nhất**) |
 | 3 | ≈ 72 | ~6.300 | **nặng nhất về kỹ thuật** — ExoPlayer, LRC, Palette |
-| 4 | ≈ 60 | ~5.300 | playlist CRUD + thư viện |
+| 4 | ≈ 71 | ~7.000 | album + playlist CRUD + thư viện (**nhiều dòng nhất**) |
 | 5 | ≈ 62 | ~4.500 | tích hợp ngoài (VNPay, AdMob) — logic khó nhất |
 
-> Khoảng LOC dồn về dải **~4.500–6.300** — đều giữa 5 người, không ai quá ít.
+> Người 2 (mảng dễ) nhẹ nhất ~3.770; Người 4 nhiều dòng nhất ~7.000 (độ khó TB). Xem **mức độ khó** bên dưới để cân người.
 
 ---
 

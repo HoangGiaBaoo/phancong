@@ -46,12 +46,12 @@
 | Người | Mảng | FE Java | Layout | BE Java | **Tổng cốt lõi** | % |
 |------|------|--------:|-------:|--------:|----------------:|--:|
 | **1** | Đăng nhập + Khung app + nền tảng chung + Hồ sơ | ~32 | ~10 | ~16 | **≈ 57** | 17% |
-| **2** | Trang chủ + Tìm kiếm + Thể loại **+ Album** | ~32 | ~24 | ~22 | **≈ 78** | 23% |
+| **2** | Trang chủ + Tìm kiếm + Thể loại | ~27 | ~22 | ~18 | **≈ 67** | 19% |
 | **3** | Trình phát + Nghệ sĩ + Đã thích/Theo dõi/Gần đây | ~34 | ~16 | ~22 | **≈ 72** | 21% |
-| **4** | Danh sách phát + Thư viện | ~30 | ~16 | ~14 | **≈ 60** | 18% |
+| **4** | Album + Danh sách phát + Thư viện | ~33 | ~18 | ~20 | **≈ 71** | 21% |
 | **5** | Premium + Thanh toán + Quảng cáo + Cài đặt + Thống kê | ~24 | ~14 | ~25 | **≈ 62** | 18% |
 
-> Số file Người 2 cao nhất vì gom nhiều adapter (RecyclerView đa kiểu) + Album. Nhưng adapter lặp khuôn nên **độ khó** vẫn thấp hơn Người 3/5 — xem LOC mục 7.
+> Người 2 nhiều adapter (RecyclerView đa kiểu) nhưng lặp khuôn → **độ khó thấp nhất** + **khối lượng nhẹ nhất** (~67 file, ~3.770 dòng). Người 4 ôm thêm Album nên **nhiều dòng nhất** (~7.000) dù độ khó chỉ TB — xem mục 7.
 
 ---
 
@@ -81,12 +81,12 @@
 | Người | Tổng LOC (ước) | Độ khó logic | Kết luận công sức |
 |------|---------------:|--------------|-------------------|
 | 1 | **~4.600** | 🔴 Cao — JWT, Spring Security, bug 404→403 | TB-cao (khái niệm khó) |
-| 2 | **~5.300** | 🟡 TB — nhiều adapter (lặp khuôn) + Album detail + Palette | Vừa (đều tay) |
+| 2 | **~3.770** | 🟢 Thấp — nhiều adapter nhưng lặp khuôn | **Nhẹ & dễ nhất** |
 | 3 | **~6.300** | 🔴 Cao — ExoPlayer, LRC sync, Palette, ShuffleController | Nặng nhất về kỹ thuật |
-| 4 | **~5.300** | 🟡 TB — kéo-thả đổi thứ tự, ghép bìa 2x2, CRUD đa màn | Vừa (đều tay) |
+| 4 | **~7.000** | 🟡 TB — album + kéo-thả đổi thứ tự, ghép bìa 2x2, CRUD đa màn | **Nhiều dòng nhất** |
 | 5 | **~4.500** | 🔴 Rất cao — VNPay HMAC-SHA512, WebView deeplink, AdMob | TB-cao (logic khó nhất) |
 
-> Dải LOC dồn về **~4.500–6.300**; Người 2 và Người 4 ngang nhau (~5.300) — khối lượng đều giữa 5 người, không ai quá ít.
+> Người 2 (mảng dễ) nhẹ nhất ~3.770; Người 4 nhiều dòng nhất ~7.000 (độ khó TB). Chủ ý: mảng dễ + nhẹ cho người ít kinh nghiệm, mảng nhiều dòng cho người làm nhanh.
 
 ### File "nặng đô" cần lưu ý (giao cho người cứng tay)
 | File | Dòng | Người | Vì sao nặng |
@@ -97,14 +97,14 @@
 | `PlayerManager` | ~179 | 3 | Máy trạng thái ExoPlayer |
 | `ShuffleController` | — | 3 | Gộp trộn bài + gate (dùng 4 màn) |
 | `MainActivity` | ~398 | 1 | Hub: nav + drawer + mini-player + QC + handleDetailIntent |
-| `AlbumDetailViewModel` / `AlbumDetailFragment` | — | 2 | Album + lưu thư viện |
+| `AlbumDetailViewModel` / `AlbumDetailFragment` | — | 4 | Album + lưu thư viện |
 | `VnpayService` + `PaymentActivity` | 122+158 | 5 | **Ngắn nhưng khó nhất**: HMAC + deeplink |
 | `AdminController` / `DataSeeder` | ~291 / 235 | 5 / 1 | Dài **nhưng dễ** (CRUD/seed máy móc) |
 
 ### 📌 Khuyến nghị
 1. **Người 3 nặng kỹ thuật nhất** (ExoPlayer) → giao cho bạn code cứng nhất.
 2. **Người 5 & 1 logic khó** (VNPay, bảo mật) → bạn chịu khó đọc tài liệu.
-3. **Người 2 & 4 nay cân nhau** (~5.300) → 2 bạn tốc độ TB.
+3. **Người 2 nhẹ & dễ nhất** → người ít kinh nghiệm; **Người 4 nhiều dòng nhất** (Album + Playlist) độ khó TB → người làm nhanh.
 4. Đừng sợ `AdminController`/`DataSeeder` dài — CRUD/seed máy móc, đọc 1 lần là hiểu.
 
 ---
