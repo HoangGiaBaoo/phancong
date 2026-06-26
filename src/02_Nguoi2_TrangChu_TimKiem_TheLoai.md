@@ -1,12 +1,15 @@
-# NGƯỜI 2 — Trang chủ, Tìm kiếm & Khám phá thể loại
+# NGƯỜI 2 — Trang chủ, Tìm kiếm, Thể loại & Album
 
-> **Miền dữ liệu:** `Genre`, `Mood`. **Vai trò:** 2 tab mặt tiền — **Trang chủ** (feed nhiều dải) + **Tìm kiếm** (gõ ra bài hát + lưới thể loại), kèm **Chi tiết thể loại** và **Bảng xếp hạng**. Nặng về RecyclerView đa kiểu.
+> **Miền dữ liệu:** `Genre`, `Mood`, **`Album`**, `AlbumType`, `SavedAlbum`. **Vai trò:** 2 tab mặt tiền — **Trang chủ** (feed nhiều dải) + **Tìm kiếm** (gõ ra bài hát + lưới thể loại), **Chi tiết thể loại**, **Bảng xếp hạng**, và (mới nhận) **Chi tiết Album + lưu album vào thư viện**. Nặng về RecyclerView đa kiểu.
 
 ```
 HomeFragment → HomeViewModel → HomeRepository → GET /api/home/feed?filter=
 SearchFragment → SearchViewModel → SearchRepository → GET /api/search?q=
    (chưa gõ: lưới thể loại → GenreDetailActivity → GET /api/genres/{id}/feed)
+NavHelper.openAlbum → AlbumDetailFragment → GET /api/albums/{id}/tracks (+ nút lưu thư viện)
 ```
+
+> 📌 Miền **Album** thuộc bạn — vì luồng tự nhiên là *duyệt (home/search/genre) → mở album*. Album đã lưu vẫn **hiện trong Thư viện của Người 4** qua endpoint của bạn (giống cách Library hiện liked/followed của Người 3).
 
 ---
 
@@ -17,22 +20,24 @@ SearchFragment → SearchViewModel → SearchRepository → GET /api/search?q=
 | `fragment/HomeFragment.java` | Fragment | Tab Trang chủ: chip lọc + feed dọc |
 | `fragment/SearchFragment.java` | Fragment | Tab Tìm kiếm: ô tìm + lưới thể loại / kết quả |
 | `GenreDetailActivity.java` | Activity | Màn 1 thể loại (dải bài/nghệ sĩ/playlist) |
+| `fragment/AlbumDetailFragment.java` ⭐ | Fragment | Chi tiết album + nút [+thư viện][tải][⋮][shuffle][play] (kế thừa `BaseDetailFragment`) |
+| `fragment/AlbumMenuBottomSheet.java` | BottomSheet | Menu ⋮ album: thêm/xoá thư viện, tải→gate, tới nghệ sĩ |
 | `HomeViewModel.java` | ViewModel | Tải feed theo filter |
 | `SearchViewModel.java` | ViewModel | `onQueryChanged`, kết quả + lưới thể loại |
 | `GenreDetailViewModel.java` | ViewModel | Tải feed 1 thể loại |
+| `AlbumDetailViewModel.java` ⭐ | ViewModel | Tải album + bài + trạng thái "đã lưu" |
 | `HomeRepository.java` | Repository | `api.homeFeed(filter)` |
 | `SearchRepository.java` | Repository | `api.search(q)` |
 | `HomeFeedAdapter.java` | Adapter | **Nhạc trưởng**: render mỗi `HomeSection` theo `kind` |
+| `GenreFeedAdapter.java` | Adapter | Render feed 1 thể loại (đa kiểu) |
 | `HomeTrackRowAdapter.java` | Adapter | Danh sách bài (dùng cả Search) |
-| `AlbumLabelAdapter.java` | Adapter | Thẻ album có nhãn Album/EP/Đĩa đơn |
-| `ArtistCircleAdapter.java` | Adapter | Avatar nghệ sĩ tròn |
+| `AlbumLabelAdapter.java` / `AlbumCardAdapter.java` | Adapter | Thẻ album có nhãn / thẻ album vuông |
+| `ArtistCircleAdapter.java` | Adapter | Avatar nghệ sĩ tròn (discovery) |
 | `RecentTileAdapter.java` | Adapter | Ô "Gần đây" |
 | `GenreTileAdapter` / `GenreTileSmallAdapter` | Adapter | Ô thể loại nhiều màu |
-| `RadioCardAdapter.java` | Adapter | Thẻ radio (4 màu nền) |
-| `ChartCardAdapter.java` | Adapter | Thẻ bảng xếp hạng |
-| `TrackCardAdapter`/`AlbumCardAdapter`/`ArtistCardAdapter`/`PlaylistCardAdapter` | Adapter | Thẻ vuông tái dùng |
-| `ExploreCardAdapter.java` | Adapter | Thẻ hashtag "#pop…" ở Search |
-| `HomeSection`/`SearchResult`/`Genre`/`GenreFeedDto`/`GenreSectionDto` | Model | DTO feed/tìm/thể loại |
+| `RadioCardAdapter.java` | Adapter | Thẻ radio (dải nhạc theo nghệ sĩ) |
+| `TrackCardAdapter` / `PlaylistCardAdapter` | Adapter | Thẻ vuông tái dùng (PlaylistCard ghép bìa 2x2 của Người 4) |
+| `HomeSection`/`SearchResult`/`Genre`/`GenreFeedDto`/`GenreSectionDto`/**`Album`** | Model | DTO feed/tìm/thể loại/album |
 
 ## 2. BẢNG FILE BACKEND (BE)
 
@@ -43,16 +48,18 @@ SearchFragment → SearchViewModel → SearchRepository → GET /api/search?q=
 | `controller/SearchController.java` | Controller | `GET /api/search?q=` |
 | `controller/ChartController.java` | Controller | `GET /api/charts/tracks\|artists` (theo playCount) |
 | `controller/GenreController.java` | Controller | `GET /api/genres`, `/{id}/tracks`, `/{id}/feed` |
-| `service/GenreFeedService.java` | Service | Ghép feed cho 1 thể loại |
-| `service/GenreService.java` | Service | CRUD thể loại |
-| `controller/GenreAdminController.java` | Controller | Admin thêm/sửa thể loại |
-| `controller/RecommendationController.java` | Controller | `GET /api/recommendations/daily\|mix` |
-| `service/RecommendationService.java` | Service | `dailyMix`, nhạc/nghệ sĩ tương tự (Home gọi sang) |
-| `entity/Genre.java` | Entity | Bảng `Genres` |
-| `entity/Mood.java` | Enum | Tâm trạng (WORKOUT/PARTY/RELAX…) cho mood playlist |
-| `repository/GenreRepository.java` | Repository | Truy vấn thể loại |
-| `dto/HomeSectionDto` | DTO | 1 dải feed (`kind,title,items`) |
-| `dto/GenreRequest, GenreResponse, GenreSectionDto, GenreFeedDto` | DTO | Thể loại |
+| `service/GenreFeedService.java` / `GenreService.java` | Service | Ghép feed 1 thể loại / CRUD thể loại |
+| `controller/RecommendationController.java` / `service/RecommendationService.java` | Controller+Service | `daily/mix`, nhạc/nghệ sĩ tương tự (Home gọi sang) |
+| `controller/AlbumController.java` ⭐ | Controller | `/api/albums`, `/new`, `/{id}`, `/{id}/tracks`, `/saved`, `/{id}/saved`, `/{id}/save` |
+| `service/AlbumService.java` ⭐ | Service | Logic album |
+| `service/LibraryService.java` ⭐ | Service | Lưu album: `getSavedAlbums/toggleSaveAlbum/isAlbumSaved` (chỉ phần album) |
+| `entity/Genre.java` / `Mood.java` | Entity/Enum | Bảng `Genres` / tâm trạng mood playlist |
+| `entity/Album.java` / `AlbumType.java` ⭐ | Entity/Enum | Bảng `Albums` / ALBUM·SINGLE·EP·COMPILATION |
+| `entity/SavedAlbum.java` + `SavedAlbumId.java` ⭐ | Entity | Album đã lưu (khoá kép user+album) |
+| `repository/GenreRepository, AlbumRepository, SavedAlbumRepository` | Repository | Truy vấn |
+| `dto/HomeSectionDto, GenreRequest/Response/SectionDto/FeedDto` + dto Album | DTO | Feed/thể loại/album |
+
+> ⚠️ `GenreAdminController` (admin web) — xem mục admin ở `00`; chỉ cần nếu nhóm demo trang admin.
 
 ## 3. DRAWABLE / ANIM THEO MÀN
 
@@ -61,21 +68,30 @@ SearchFragment → SearchViewModel → SearchRepository → GET /api/search?q=
 | `fragment_home` | `bg_avatar_orange`, `bg_chip_selector` (4 chip lọc) |
 | `fragment_search` | `bg_avatar_orange`, `ic_camera`, `bg_search_bar`, `ic_search` |
 | `activity_genre_detail` | `placeholder_gradient`, `ic_arrow_back` |
-| `item_home_featured` | `bg_card_dark`, `ic_more_vert` |
-| `item_home_chart` | `bg_card_top50` |
+| `fragment_album_detail` | `placeholder_gradient`, `ic_arrow_back`, `ic_add_circle_outline`, `ic_download`, `ic_more_vert`, `ic_shuffle`, `ic_play` (Java đổi `ic_check_circle_green` khi đã lưu) |
+| `bottom_sheet_album_menu` | `placeholder_gradient`, `ic_add_circle_outline`, `ic_download`, `ic_person` |
+| `item_home_featured` | `bg_card_dark`, `ic_more_vert` (bìa ghép 2x2 qua `PlaylistCoverView`) |
 | `item_home_recent_tile` | `bg_recent_tile` |
-| `item_genre_tile` / `_small` | `bg_genre_tile`, `placeholder_gradient` |
-| `item_radio_card` | `bg_radio_pastel` (Java đổi: `bg_radio_orange/teal/purple`) |
-| `item_artist_circle` / `item_explore_artist_card` | `placeholder_gradient` / `bg_card_dark` |
+| `item_genre_tile` / `_small` / `item_genre_section` | `bg_genre_tile`, `placeholder_gradient` |
+| `item_radio_card` | `bg_radio_pastel` (Java đổi: orange/teal/purple) |
+| `item_artist_circle` / `item_album_card` / `item_album_label_card` / `item_track_card` | `placeholder_gradient` |
 | shimmer home/genre | `bg_shimmer_box` |
 
-> Không màn nào của bạn dùng `anim` riêng.
+> Không màn nào của bạn dùng `anim` riêng (chuyển màn dùng anim chung Người 1).
 
-## 4. LUỒNG HOME FEED
-1. `HomeFragment` → `vm.loadIfNeeded()` → `HomeRepository.getFeed(filter)` → `GET /api/home/feed`.
-2. BE `HomeFeedService.buildFeed(userId, filter)` ghép nhiều dải (FEATURED, RECENTLY_PLAYED, RECOMMENDED→gọi `RecommendationService`, CHART, 6×MOOD, NEW_RELEASES, POPULAR_ARTISTS), bỏ dải rỗng.
-3. `HomeFeedAdapter` render mỗi `kind` thành 1 RecyclerView ngang. Bấm thẻ → `NavHelper.openAlbum/openArtist/openPlaylist` hoặc mở `PlayerActivity`.
+## 4. ⭐ THỨ TỰ ĐỌC FILE
+
+**Luồng Trang chủ (đọc trước):**
+1. `fragment/HomeFragment` → `HomeViewModel` → `data/repository/HomeRepository` → `ApiService.homeFeed`.
+2. `adapter/HomeFeedAdapter` (xem nó chọn adapter con theo `kind`: HomeTrackRow / AlbumLabel / ArtistCircle / PlaylistCard / RecentTile).
+3. BE: `HomeController` → `HomeFeedService` (ghép dải; gọi `RecommendationService`, `ChartController` nguồn).
+
+**Luồng Tìm kiếm:** 4. `fragment/SearchFragment` → `SearchViewModel` → `SearchRepository` → `SearchController`.
+
+**Luồng Thể loại:** 5. `SearchFragment` (lưới thể loại) → `GenreDetailActivity` → `GenreDetailViewModel` → `LibraryRepository.getGenreFeed` (repo của Người 4) → `GenreController` → `GenreFeedService`; xem `adapter/GenreFeedAdapter`.
+
+**Luồng Album (mới nhận):** 6. `NavHelper.openAlbum` → `fragment/AlbumDetailFragment` (kế thừa `BaseDetailFragment`) → `AlbumDetailViewModel` → `LibraryRepository` (hàm album, repo Người 4) → `AlbumController` → `AlbumService` → `entity/Album`; nút lưu → `LibraryService` + `SavedAlbum`; menu ⋮ → `AlbumMenuBottomSheet`.
 
 ## 5. ENDPOINT · GIAO
-- **Endpoint:** `/api/home/feed`, `/api/search`, `/api/genres{,/{id}/tracks,/{id}/feed}`, `/api/charts/{tracks,artists}`, `/api/recommendations/{daily,mix}`.
-- **Giao:** bấm item → `NavHelper` (Người 1) mở chi tiết Album (Người 4) / Nghệ sĩ (Người 3) / Player (Người 3). `HomeFeedService` đọc `PlayHistory`/`Album`/`Artist` (entity của Người 3/4). `GenreDetailViewModel` dùng `LibraryRepository.getGenreFeed` (Người 4 quản repo, nhưng endpoint genre là của bạn).
+- **Endpoint:** `/api/home/feed`, `/api/search`, `/api/genres{,/{id}/tracks,/{id}/feed}`, `/api/charts/{tracks,artists}`, `/api/recommendations/{daily,mix}`, **`/api/albums/*` (gồm saved)**.
+- **Giao:** bấm item → `NavHelper` (Người 1) mở chi tiết Nghệ sĩ (Người 3) / Player (Người 3) / Album (bạn) · `HomeFeedService` đọc `PlayHistory`/`Artist` (Người 3) + `Playlist` curated (Người 4) · `AlbumDetailViewModel` dùng `LibraryRepository` (Người 4 quản, dùng chung) · bài trong album bấm phát → `PlayerManager.play()` (Người 3) · nút "Tải" → gate (Người 5) · **Album đã lưu hiện ở Thư viện (Người 4)** qua `/api/albums/saved` của bạn.
